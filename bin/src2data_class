@@ -1,0 +1,7 @@
+#!/bin/sh
+
+SRC_DIR=../src
+DATA_DIR=../data_class
+
+mkdir -p "$DATA_DIR"
+javac -d "$DATA_DIR" $SRC_DIR/*.java

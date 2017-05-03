@@ -1,0 +1,27 @@
+#!/usr/bin/env ruby
+
+require 'fileutils'
+require_relative 'java_class'
+
+CLASS_DIR = "../data_class/"
+BYTECODE_DIR = "../data_bytecode/"
+
+def extract_bytecode(fn)
+  class_name = File.basename(fn).gsub(/\.class$/, '')
+  puts class_name
+  jc = JavaClass.from_file(fn)
+  jc.methods.each { |mi|
+    method_name = mi.name_as_str
+    mi.attributes.each { |a|
+      if a.name_as_str == 'Code'
+        fn = "#{class_name}_#{method_name}.bin".tr('<>', '!')
+        File.binwrite(BYTECODE_DIR + fn, a.info.code)
+      end
+    }
+  }
+end
+
+FileUtils::mkdir_p(BYTECODE_DIR)
+Dir.glob("#{CLASS_DIR}/*.class").each { |fn|
+  extract_bytecode(fn)
+}
