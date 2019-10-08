@@ -2,6 +2,7 @@ meta:
   id: java_bytecode
   endian: be
   title: Java Virtual Machine bytecode
+  license: MIT
 doc-ref: https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-6.html
 seq:
   - id: instructions
