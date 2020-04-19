@@ -1,6 +1,6 @@
 #!/bin/sh
 
-SRC_DIR=../src
+SRC_DIR=../data_java
 DATA_DIR=../data_class
 
 mkdir -p "$DATA_DIR"
