@@ -2,8 +2,8 @@
 
 require 'kaitai/struct/struct'
 
-unless Gem::Version.new(Kaitai::Struct::VERSION) >= Gem::Version.new('0.7')
-  raise "Incompatible Kaitai Struct Ruby API: 0.7 or later is required, but you have #{Kaitai::Struct::VERSION}"
+unless Gem::Version.new(Kaitai::Struct::VERSION) >= Gem::Version.new('0.9')
+  raise "Incompatible Kaitai Struct Ruby API: 0.9 or later is required, but you have #{Kaitai::Struct::VERSION}"
 end
 
 
@@ -12,7 +12,12 @@ end
 class JavaClass < Kaitai::Struct::Struct
   def initialize(_io, _parent = nil, _root = self)
     super(_io, _parent, _root)
-    @magic = @_io.ensure_fixed_contents([202, 254, 186, 190].pack('C*'))
+    _read
+  end
+
+  def _read
+    @magic = @_io.read_bytes(4)
+    raise Kaitai::Struct::ValidationNotEqualError.new([202, 254, 186, 190].pack('C*'), magic, _io, "/seq/0") if not magic == [202, 254, 186, 190].pack('C*')
     @version_minor = @_io.read_u2be
     @version_major = @_io.read_u2be
     @constant_pool_count = @_io.read_u2be
@@ -43,6 +48,7 @@ class JavaClass < Kaitai::Struct::Struct
     (attributes_count).times { |i|
       @attributes[i] = AttributeInfo.new(@_io, self, @_root)
     }
+    self
   end
 
   ##
@@ -50,7 +56,12 @@ class JavaClass < Kaitai::Struct::Struct
   class FloatCpInfo < Kaitai::Struct::Struct
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @value = @_io.read_f4be
+      self
     end
     attr_reader :value
   end
@@ -60,28 +71,33 @@ class JavaClass < Kaitai::Struct::Struct
   class AttributeInfo < Kaitai::Struct::Struct
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @name_index = @_io.read_u2be
       @attribute_length = @_io.read_u4be
       case name_as_str
       when "SourceFile"
         @_raw_info = @_io.read_bytes(attribute_length)
-        io = Kaitai::Struct::Stream.new(@_raw_info)
-        @info = AttrBodySourceFile.new(io, self, @_root)
+        _io__raw_info = Kaitai::Struct::Stream.new(@_raw_info)
+        @info = AttrBodySourceFile.new(_io__raw_info, self, @_root)
       when "LineNumberTable"
         @_raw_info = @_io.read_bytes(attribute_length)
-        io = Kaitai::Struct::Stream.new(@_raw_info)
-        @info = AttrBodyLineNumberTable.new(io, self, @_root)
+        _io__raw_info = Kaitai::Struct::Stream.new(@_raw_info)
+        @info = AttrBodyLineNumberTable.new(_io__raw_info, self, @_root)
       when "Exceptions"
         @_raw_info = @_io.read_bytes(attribute_length)
-        io = Kaitai::Struct::Stream.new(@_raw_info)
-        @info = AttrBodyExceptions.new(io, self, @_root)
+        _io__raw_info = Kaitai::Struct::Stream.new(@_raw_info)
+        @info = AttrBodyExceptions.new(_io__raw_info, self, @_root)
       when "Code"
         @_raw_info = @_io.read_bytes(attribute_length)
-        io = Kaitai::Struct::Stream.new(@_raw_info)
-        @info = AttrBodyCode.new(io, self, @_root)
+        _io__raw_info = Kaitai::Struct::Stream.new(@_raw_info)
+        @info = AttrBodyCode.new(_io__raw_info, self, @_root)
       else
         @info = @_io.read_bytes(attribute_length)
       end
+      self
     end
 
     ##
@@ -89,6 +105,10 @@ class JavaClass < Kaitai::Struct::Struct
     class AttrBodyCode < Kaitai::Struct::Struct
       def initialize(_io, _parent = nil, _root = self)
         super(_io, _parent, _root)
+        _read
+      end
+
+      def _read
         @max_stack = @_io.read_u2be
         @max_locals = @_io.read_u2be
         @code_length = @_io.read_u4be
@@ -103,6 +123,7 @@ class JavaClass < Kaitai::Struct::Struct
         (attributes_count).times { |i|
           @attributes[i] = AttributeInfo.new(@_io, self, @_root)
         }
+        self
       end
 
       ##
@@ -110,10 +131,15 @@ class JavaClass < Kaitai::Struct::Struct
       class ExceptionEntry < Kaitai::Struct::Struct
         def initialize(_io, _parent = nil, _root = self)
           super(_io, _parent, _root)
+          _read
+        end
+
+        def _read
           @start_pc = @_io.read_u2be
           @end_pc = @_io.read_u2be
           @handler_pc = @_io.read_u2be
           @catch_type = @_io.read_u2be
+          self
         end
         def catch_exception
           return @catch_exception unless @catch_exception.nil?
@@ -158,16 +184,26 @@ class JavaClass < Kaitai::Struct::Struct
     class AttrBodyExceptions < Kaitai::Struct::Struct
       def initialize(_io, _parent = nil, _root = self)
         super(_io, _parent, _root)
+        _read
+      end
+
+      def _read
         @number_of_exceptions = @_io.read_u2be
         @exceptions = Array.new(number_of_exceptions)
         (number_of_exceptions).times { |i|
           @exceptions[i] = ExceptionTableEntry.new(@_io, self, @_root)
         }
+        self
       end
       class ExceptionTableEntry < Kaitai::Struct::Struct
         def initialize(_io, _parent = nil, _root = self)
           super(_io, _parent, _root)
+          _read
+        end
+
+        def _read
           @index = @_io.read_u2be
+          self
         end
         def as_info
           return @as_info unless @as_info.nil?
@@ -190,7 +226,12 @@ class JavaClass < Kaitai::Struct::Struct
     class AttrBodySourceFile < Kaitai::Struct::Struct
       def initialize(_io, _parent = nil, _root = self)
         super(_io, _parent, _root)
+        _read
+      end
+
+      def _read
         @sourcefile_index = @_io.read_u2be
+        self
       end
       def sourcefile_as_str
         return @sourcefile_as_str unless @sourcefile_as_str.nil?
@@ -205,17 +246,27 @@ class JavaClass < Kaitai::Struct::Struct
     class AttrBodyLineNumberTable < Kaitai::Struct::Struct
       def initialize(_io, _parent = nil, _root = self)
         super(_io, _parent, _root)
+        _read
+      end
+
+      def _read
         @line_number_table_length = @_io.read_u2be
         @line_number_table = Array.new(line_number_table_length)
         (line_number_table_length).times { |i|
           @line_number_table[i] = LineNumberTableEntry.new(@_io, self, @_root)
         }
+        self
       end
       class LineNumberTableEntry < Kaitai::Struct::Struct
         def initialize(_io, _parent = nil, _root = self)
           super(_io, _parent, _root)
+          _read
+        end
+
+        def _read
           @start_pc = @_io.read_u2be
           @line_number = @_io.read_u2be
+          self
         end
         attr_reader :start_pc
         attr_reader :line_number
@@ -239,8 +290,13 @@ class JavaClass < Kaitai::Struct::Struct
   class MethodRefCpInfo < Kaitai::Struct::Struct
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @class_index = @_io.read_u2be
       @name_and_type_index = @_io.read_u2be
+      self
     end
     def class_as_info
       return @class_as_info unless @class_as_info.nil?
@@ -261,6 +317,10 @@ class JavaClass < Kaitai::Struct::Struct
   class FieldInfo < Kaitai::Struct::Struct
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @access_flags = @_io.read_u2be
       @name_index = @_io.read_u2be
       @descriptor_index = @_io.read_u2be
@@ -269,6 +329,7 @@ class JavaClass < Kaitai::Struct::Struct
       (attributes_count).times { |i|
         @attributes[i] = AttributeInfo.new(@_io, self, @_root)
       }
+      self
     end
     def name_as_str
       return @name_as_str unless @name_as_str.nil?
@@ -287,7 +348,12 @@ class JavaClass < Kaitai::Struct::Struct
   class DoubleCpInfo < Kaitai::Struct::Struct
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @value = @_io.read_f8be
+      self
     end
     attr_reader :value
   end
@@ -297,7 +363,12 @@ class JavaClass < Kaitai::Struct::Struct
   class LongCpInfo < Kaitai::Struct::Struct
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @value = @_io.read_u8be
+      self
     end
     attr_reader :value
   end
@@ -307,8 +378,13 @@ class JavaClass < Kaitai::Struct::Struct
   class InvokeDynamicCpInfo < Kaitai::Struct::Struct
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @bootstrap_method_attr_index = @_io.read_u2be
       @name_and_type_index = @_io.read_u2be
+      self
     end
     attr_reader :bootstrap_method_attr_index
     attr_reader :name_and_type_index
@@ -332,8 +408,13 @@ class JavaClass < Kaitai::Struct::Struct
     I__REFERENCE_KIND_ENUM = REFERENCE_KIND_ENUM.invert
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @reference_kind = Kaitai::Struct::Stream::resolve_enum(REFERENCE_KIND_ENUM, @_io.read_u1)
       @reference_index = @_io.read_u2be
+      self
     end
     attr_reader :reference_kind
     attr_reader :reference_index
@@ -344,8 +425,13 @@ class JavaClass < Kaitai::Struct::Struct
   class NameAndTypeCpInfo < Kaitai::Struct::Struct
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @name_index = @_io.read_u2be
       @descriptor_index = @_io.read_u2be
+      self
     end
     def name_as_info
       return @name_as_info unless @name_as_info.nil?
@@ -376,8 +462,13 @@ class JavaClass < Kaitai::Struct::Struct
   class Utf8CpInfo < Kaitai::Struct::Struct
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @str_len = @_io.read_u2be
       @value = (@_io.read_bytes(str_len)).force_encoding("UTF-8")
+      self
     end
     attr_reader :str_len
     attr_reader :value
@@ -388,7 +479,12 @@ class JavaClass < Kaitai::Struct::Struct
   class StringCpInfo < Kaitai::Struct::Struct
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @string_index = @_io.read_u2be
+      self
     end
     attr_reader :string_index
   end
@@ -398,7 +494,12 @@ class JavaClass < Kaitai::Struct::Struct
   class MethodTypeCpInfo < Kaitai::Struct::Struct
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @descriptor_index = @_io.read_u2be
+      self
     end
     attr_reader :descriptor_index
   end
@@ -408,8 +509,13 @@ class JavaClass < Kaitai::Struct::Struct
   class InterfaceMethodRefCpInfo < Kaitai::Struct::Struct
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @class_index = @_io.read_u2be
       @name_and_type_index = @_io.read_u2be
+      self
     end
     def class_as_info
       return @class_as_info unless @class_as_info.nil?
@@ -430,7 +536,12 @@ class JavaClass < Kaitai::Struct::Struct
   class ClassCpInfo < Kaitai::Struct::Struct
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @name_index = @_io.read_u2be
+      self
     end
     def name_as_info
       return @name_as_info unless @name_as_info.nil?
@@ -468,31 +579,42 @@ class JavaClass < Kaitai::Struct::Struct
     I__TAG_ENUM = TAG_ENUM.invert
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @tag = Kaitai::Struct::Stream::resolve_enum(TAG_ENUM, @_io.read_u1)
       case tag
-      when :tag_enum_string
-        @cp_info = StringCpInfo.new(@_io, self, @_root)
-      when :tag_enum_double
-        @cp_info = DoubleCpInfo.new(@_io, self, @_root)
-      when :tag_enum_class_type
-        @cp_info = ClassCpInfo.new(@_io, self, @_root)
-      when :tag_enum_method_ref
-        @cp_info = MethodRefCpInfo.new(@_io, self, @_root)
-      when :tag_enum_long
-        @cp_info = LongCpInfo.new(@_io, self, @_root)
-      when :tag_enum_name_and_type
-        @cp_info = NameAndTypeCpInfo.new(@_io, self, @_root)
-      when :tag_enum_float
-        @cp_info = FloatCpInfo.new(@_io, self, @_root)
       when :tag_enum_interface_method_ref
         @cp_info = InterfaceMethodRefCpInfo.new(@_io, self, @_root)
-      when :tag_enum_integer
-        @cp_info = IntegerCpInfo.new(@_io, self, @_root)
+      when :tag_enum_class_type
+        @cp_info = ClassCpInfo.new(@_io, self, @_root)
       when :tag_enum_utf8
         @cp_info = Utf8CpInfo.new(@_io, self, @_root)
+      when :tag_enum_method_type
+        @cp_info = MethodTypeCpInfo.new(@_io, self, @_root)
+      when :tag_enum_integer
+        @cp_info = IntegerCpInfo.new(@_io, self, @_root)
+      when :tag_enum_string
+        @cp_info = StringCpInfo.new(@_io, self, @_root)
+      when :tag_enum_float
+        @cp_info = FloatCpInfo.new(@_io, self, @_root)
+      when :tag_enum_long
+        @cp_info = LongCpInfo.new(@_io, self, @_root)
+      when :tag_enum_method_ref
+        @cp_info = MethodRefCpInfo.new(@_io, self, @_root)
+      when :tag_enum_double
+        @cp_info = DoubleCpInfo.new(@_io, self, @_root)
+      when :tag_enum_invoke_dynamic
+        @cp_info = InvokeDynamicCpInfo.new(@_io, self, @_root)
       when :tag_enum_field_ref
         @cp_info = FieldRefCpInfo.new(@_io, self, @_root)
+      when :tag_enum_method_handle
+        @cp_info = MethodHandleCpInfo.new(@_io, self, @_root)
+      when :tag_enum_name_and_type
+        @cp_info = NameAndTypeCpInfo.new(@_io, self, @_root)
       end
+      self
     end
     attr_reader :tag
     attr_reader :cp_info
@@ -503,6 +625,10 @@ class JavaClass < Kaitai::Struct::Struct
   class MethodInfo < Kaitai::Struct::Struct
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @access_flags = @_io.read_u2be
       @name_index = @_io.read_u2be
       @descriptor_index = @_io.read_u2be
@@ -511,6 +637,7 @@ class JavaClass < Kaitai::Struct::Struct
       (attributes_count).times { |i|
         @attributes[i] = AttributeInfo.new(@_io, self, @_root)
       }
+      self
     end
     def name_as_str
       return @name_as_str unless @name_as_str.nil?
@@ -529,7 +656,12 @@ class JavaClass < Kaitai::Struct::Struct
   class IntegerCpInfo < Kaitai::Struct::Struct
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @value = @_io.read_u4be
+      self
     end
     attr_reader :value
   end
@@ -539,8 +671,13 @@ class JavaClass < Kaitai::Struct::Struct
   class FieldRefCpInfo < Kaitai::Struct::Struct
     def initialize(_io, _parent = nil, _root = self)
       super(_io, _parent, _root)
+      _read
+    end
+
+    def _read
       @class_index = @_io.read_u2be
       @name_and_type_index = @_io.read_u2be
+      self
     end
     def class_as_info
       return @class_as_info unless @class_as_info.nil?
